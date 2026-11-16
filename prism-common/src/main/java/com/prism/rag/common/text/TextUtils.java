@@ -33,11 +33,17 @@ public final class TextUtils {
 
     /**
      * 句子切分：按中英文标点断句。
+     *
+     * <p><b>会合并"标题式"的短片段。</b>例如 Markdown 解析后的一行小标题
+     * "住宿标准" 会单独成句，但它其实只是下面那段话的引导语。
+     * 如果不合并，引用摘要就会只显示"住宿标准"四个字，用户完全看不到答案。</p>
+     *
+     * <p>判定规则：长度 ≤ 8 且不以句末标点结尾 → 认为是标题，合并到下一句。</p>
      */
     public static List<String> splitSentences(String text) {
-        List<String> sentences = new ArrayList<>();
+        List<String> raw = new ArrayList<>();
         if (text == null || text.isBlank()) {
-            return sentences;
+            return raw;
         }
         StringBuilder current = new StringBuilder();
         for (int i = 0; i < text.length(); i++) {
@@ -47,16 +53,55 @@ public final class TextUtils {
                     || c == '.' || c == '!' || c == '?' || c == ';') {
                 String sentence = current.toString().trim();
                 if (!sentence.isEmpty()) {
-                    sentences.add(sentence);
+                    raw.add(sentence);
                 }
                 current.setLength(0);
             }
         }
         String rest = current.toString().trim();
         if (!rest.isEmpty()) {
-            sentences.add(rest);
+            raw.add(rest);
         }
-        return sentences;
+        return mergeHeadingFragments(raw);
+    }
+
+    /**
+     * 把"短小且没有句末标点"的片段（典型是标题）与它后面的正文合并成一个单元。
+     *
+     * <p>为什么要合？Markdown 解析后的一行小标题会单独成句，
+     * 如果不合并，引用摘要可能只显示"住宿标准"四个字，用户完全看不到答案。</p>
+     */
+    private static List<String> mergeHeadingFragments(List<String> sentences) {
+        List<String> merged = new ArrayList<>();
+        StringBuilder pending = new StringBuilder();
+        for (String sentence : sentences) {
+            String trimmed = sentence.trim();
+            if (isHeadingLike(trimmed)) {
+                // 连续多个标题（如《文档标题》+ 章节标题）会先全部挂起
+                if (pending.length() > 0) {
+                    pending.append('\n');
+                }
+                pending.append(trimmed);
+                continue;
+            }
+            if (pending.length() > 0) {
+                // 标题 + 正文 合成一个单元，标题信息不会丢，正文也不会被孤立
+                trimmed = pending + "\n" + trimmed;
+                pending.setLength(0);
+            }
+            merged.add(trimmed);
+        }
+        if (pending.length() > 0) {
+            merged.add(pending.toString());
+        }
+        return merged;
+    }
+
+    /**
+     * 是否像一个小标题：够短，且不以句末标点结尾。
+     */
+    private static boolean isHeadingLike(String text) {
+        return text.length() <= 8 && !text.matches(".*[。！？；.!?;]$");
     }
 
     /**
@@ -145,5 +190,20 @@ public final class TextUtils {
      */
     public static boolean isBlank(String text) {
         return text == null || text.isBlank();
+    }
+
+    /**
+     * 粗略估算 token 数。
+     *
+     * <p>中文约 1 字 ≈ 1 token，英文约 4 字符 ≈ 1 token。
+     * 分块大小、Token 预算控制都靠这个估算值（真实模型请用返回的 usage 字段）。</p>
+     */
+    public static int estimateTokens(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        long cjk = text.chars().filter(c -> c >= 0x4E00 && c <= 0x9FFF).count();
+        long other = text.length() - cjk;
+        return (int) (cjk + Math.ceil(other / 4.0));
     }
 }

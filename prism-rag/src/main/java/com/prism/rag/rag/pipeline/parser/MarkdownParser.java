@@ -44,7 +44,10 @@ public class MarkdownParser implements DocumentParser {
             if (matcher.matches()) {
                 // 遇到新标题：先把上一节收尾
                 flush(sections, currentHeading, currentBody);
-                currentHeading = clean(matcher.group(2));
+                String heading = clean(matcher.group(2));
+                // 如果标题和文档标题相同（如 Markdown 的 H1），置空：
+                // 分块时会自动补上《文档标题》，避免同一句话在 chunk 里出现两遍。
+                currentHeading = heading.equals(title) ? null : heading;
                 currentBody.setLength(0);
             } else {
                 currentBody.append(line).append('\n');

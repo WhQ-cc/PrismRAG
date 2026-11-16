@@ -74,7 +74,23 @@ public final class Tokenizer {
                 cjkBuffer.add(c);
             } else if (isWordChar(c)) {
                 flushCjk(cjkBuffer, tokens);
-                asciiBuffer.append(Character.toLowerCase(c));
+                // 英文/数字串内部再按"字母段 / 数字段"切分
+                // 例：SO20240315001 → so + 20240315001
+                // 这样用户只搜 "20240315001" 也能命中整串 "SO20240315001"，
+                // 订单号这类"前缀+数字"的场景召回率会明显提升。
+                int j = i;
+                while (j < text.length() && isWordChar(text.charAt(j))) {
+                    boolean digit = Character.isDigit(text.charAt(j));
+                    int k = j;
+                    while (k < text.length() && isWordChar(text.charAt(k))
+                            && Character.isDigit(text.charAt(k)) == digit) {
+                        k++;
+                    }
+                    asciiBuffer.append(text.substring(j, k).toLowerCase(Locale.ROOT));
+                    flushAscii(asciiBuffer, tokens);
+                    j = k;
+                }
+                i = j;
             } else {
                 // 标点/空白是天然的分隔符
                 flushAscii(asciiBuffer, tokens);
