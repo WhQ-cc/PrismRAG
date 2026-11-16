@@ -1,12 +1,20 @@
 package com.prism.rag.framework.config;
 
+import com.prism.rag.framework.context.TraceTaskDecorator;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.core.task.TaskDecorator;
 
-import java.util.concurrent.Executor;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -41,12 +49,20 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <tr><td>misc</td><td>Agent 工具、杂项异步</td><td>兜底池</td></tr>
  * </table>
  *
+ * <p><b>为什么直接用 {@link ThreadPoolExecutor} 而不是 Spring 的 ThreadPoolTaskExecutor？</b><br>
+ * 因为 Spring 的 {@code ThreadPoolTaskExecutor} 只实现了 {@code Executor}，
+ * <b>没有 {@code submit()}，也就拿不到 {@code Future}</b>，
+ * 而 SSE 问答的"断开取消"必须依赖 {@code Future.cancel(true)} 去中断线程。
+ * 所以这里直接用 JDK 原生的 {@code ThreadPoolExecutor}（它实现 {@code ExecutorService}）。</p>
+ *
  * <p><b>换成动态线程池？</b>生产上可以用「oneThread」这类动态线程池框架，
  * 把核心/最大线程数、队列长度放到配置中心实时调整，并接入监控告警。
  * 本项目先用固定参数把"隔离"的思路讲清楚。</p>
  */
 @Configuration
 public class ThreadPoolConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(ThreadPoolConfig.class);
 
     /** 入库流水线：解析→分块→向量化→持久化的编排线程 */
     public static final String INGEST_EXECUTOR = "ingestExecutor";
@@ -63,6 +79,9 @@ public class ThreadPoolConfig {
     /** 杂项线程池：Agent 工具调用、后台维护任务 */
     public static final String MISC_EXECUTOR = "miscExecutor";
 
+    /** 全部线程池，应用关闭时统一收尾 */
+    private final List<ExecutorService> pools = new ArrayList<>();
+
     /**
      * 入库流水线主控池。
      *
@@ -70,7 +89,7 @@ public class ThreadPoolConfig {
      * 宁可让提交者变慢，也不能把任务丢掉——入库任务是用户显式发起的。</p>
      */
     @Bean(name = INGEST_EXECUTOR)
-    public Executor ingestExecutor() {
+    public ExecutorService ingestExecutor() {
         return build("prism-ingest", 4, 8, 256, new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
@@ -81,7 +100,7 @@ public class ThreadPoolConfig {
      * 和本地的解析/分块计算混在一起会白白占着 CPU 却什么都干不了。</p>
      */
     @Bean(name = EMBEDDING_EXECUTOR)
-    public Executor embeddingExecutor() {
+    public ExecutorService embeddingExecutor() {
         return build("prism-embed", 8, 16, 512, new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
@@ -93,7 +112,7 @@ public class ThreadPoolConfig {
      * 队列积压意味着用户已经等了很久了。</p>
      */
     @Bean(name = RETRIEVAL_EXECUTOR)
-    public Executor retrievalExecutor() {
+    public ExecutorService retrievalExecutor() {
         return build("prism-retrieval", 8, 16, 64, new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
@@ -109,7 +128,7 @@ public class ThreadPoolConfig {
      * 那是另一种雪崩。</p>
      */
     @Bean(name = CHAT_EXECUTOR)
-    public Executor chatExecutor() {
+    public ExecutorService chatExecutor() {
         return build("prism-chat", 16, 32, 128, new ThreadPoolExecutor.AbortPolicy());
     }
 
@@ -117,43 +136,58 @@ public class ThreadPoolConfig {
      * 杂项池。
      */
     @Bean(name = MISC_EXECUTOR)
-    public Executor miscExecutor() {
+    public ExecutorService miscExecutor() {
         return build("prism-misc", 4, 8, 256, new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     /**
-     * 构建一个带命名线程的线程池。
+     * 构建一个带命名线程、支持上下文透传的线程池。
      *
      * <p>线程必须有可读名字（prism-chat-1、prism-ingest-3……），
      * 否则线上 dump 出来一堆 "pool-3-thread-7"，排查问题时根本分不清是谁。</p>
      */
-    private Executor build(String namePrefix, int core, int max, int queueCapacity,
-                           RejectedExecutionHandler rejection) {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(core);
-        executor.setMaxPoolSize(max);
-        executor.setQueueCapacity(queueCapacity);
-        executor.setKeepAliveSeconds(60);
-        executor.setThreadNamePrefix(namePrefix + "-");
-        executor.setRejectedExecutionHandler(rejection);
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(30);
-        executor.setTaskDecorator(new com.prism.rag.framework.context.TraceTaskDecorator());
-        // 允许 corePoolSize 随负载增长，避免排队
-        executor.setAllowCoreThreadTimeOut(false);
-        executor.initialize();
+    private ExecutorService build(String namePrefix, int core, int max, int queueCapacity,
+                                  RejectedExecutionHandler rejection) {
+        final TaskDecorator decorator = new TraceTaskDecorator();
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                core, max, 60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(queueCapacity),
+                new NamedThreadFactory(namePrefix),
+                rejection) {
+            @Override
+            public void execute(Runnable command) {
+                // 提交任务时捕获上下文、执行时恢复（见 TraceTaskDecorator）
+                super.execute(decorator.decorate(command));
+            }
+        };
+        pools.add(executor);
         return executor;
     }
 
     /**
-     * 线程工厂（保留供文档演示 Spring 默认实现的差异）。
+     * 应用关闭时优雅停机：先停止接收新任务，再等存量任务跑完。
      */
-    public static ThreadPoolExecutor.AbortPolicy defaultAbortPolicy() {
-        return new ThreadPoolExecutor.AbortPolicy();
+    @PreDestroy
+    public void shutdown() {
+        log.info("[ThreadPool] 开始关闭 {} 个线程池", pools.size());
+        for (ExecutorService pool : pools) {
+            pool.shutdown();
+        }
+        for (ExecutorService pool : pools) {
+            try {
+                if (!pool.awaitTermination(20, TimeUnit.SECONDS)) {
+                    pool.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                pool.shutdownNow();
+            }
+        }
+        log.info("[ThreadPool] 全部线程池已关闭");
     }
 
     /**
-     * 自增编号的线程工厂示例。
+     * 命名线程工厂：线程名可读，便于线上排查。
      */
     public static class NamedThreadFactory implements java.util.concurrent.ThreadFactory {
         private final String prefix;
