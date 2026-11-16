@@ -1,0 +1,99 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: prism-rag
+
+  # ---------------------------------------------------------------------------
+  # 数据源：默认使用本地 H2 文件库，开箱即用，不需要装 MySQL。
+  # 换成 MySQL 只需要改下面四行：
+  #   url: jdbc:mysql://localhost:3306/prismrag?useSSL=false&characterEncoding=utf8
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
+  #   username: root
+  #   password: 你的密码
+  # ---------------------------------------------------------------------------
+  datasource:
+    url: jdbc:h2:file:./data/prismrag;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  mvc:
+    async:
+      # SSE 长连接的请求超时（毫秒），需要大于 chat.sse-timeout-millis
+      request-timeout: 300000
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+# ===========================================================================
+# PrismRAG 业务配置
+# ===========================================================================
+prism:
+  ai:
+    # auto：填了 api-key 用真实模型，没填用内置离线 Mock
+    provider: auto
+    # 从环境变量读取，避免把 Key 写进代码仓库
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${AI_BASE_URL:https://api.openai.com}
+    chat-model: ${AI_CHAT_MODEL:gpt-4o-mini}
+    embedding-model: ${AI_EMBEDDING_MODEL:text-embedding-3-small}
+    # 离线本地向量模型的维度（真实模型以模型返回为准）
+    embedding-dimension: 256
+    temperature: 0.3
+    max-tokens: 1024
+    timeout-seconds: 60
+    # Mock 模式逐字输出的间隔（毫秒），调小可以让流式效果更快
+    mock-stream-delay-millis: 16
+
+  ingestion:
+    # 分块策略：window（滑动窗口） / paragraph（语义边界）
+    chunk-strategy: window
+    chunk-size: 300
+    chunk-overlap: 50
+    # 是否把标题拼到每个 chunk 前面（补上下文，强烈建议开启）
+    prepend-title: true
+    # 单批送去做向量化的 chunk 数
+    embedding-batch-size: 32
+
+  chat:
+    # 最终喂给模型的检索条数
+    top-k: 5
+    # 进入 Prompt 的最近消息条数
+    memory-messages: 12
+    # 消息数超过该值触发一次滚动摘要
+    summary-threshold: 24
+    # SSE 连接超时（毫秒）
+    sse-timeout-millis: 180000
+
+  agent:
+    # ReAct 最大执行步数（熔断，防止死循环）
+    max-steps: 6
+
+logging:
+  level:
+    root: INFO
+    com.prism.rag: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
