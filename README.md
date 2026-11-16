@@ -1,4 +1,4 @@
-# PrismRAG · 一个从 0 手写的 Java 检索增强问答（RAG）工程
+# PrismRAG · 一个 Java 检索增强问答（RAG）工程
 
 > 参考 [nageoffer/ragent](https://github.com/nageoffer/ragent) 的分层思想，用 **JDK 21 + Spring Boot 3.5** 从零实现。
 > 目标不是"跑通一个 Demo"，而是让一个**初级 Java 工程师能通过 `git log` 读懂整个系统的逻辑与写法**。
