@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrismRAG · 知识库问答</title>
+    <link rel="stylesheet" href="assets/css/glass.css">
+    <link rel="icon"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>">
+</head>
+<body>
+<!-- 背景：模糊光斑 + 噪点，玻璃质感的"被折射对象" -->
+<div class="bg-layer">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+    <div class="noise"></div>
+</div>
+
+<div class="app">
+    <!-- ============ 侧边栏 ============ -->
+    <aside class="sidebar glass">
+        <div class="brand">
+            <div class="brand-logo">🔮</div>
+            <div>
+                <div class="brand-name">PrismRAG</div>
+                <div class="brand-sub">Agentic RAG 工程</div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <div class="nav-item active" data-view="chat">
+                <span class="nav-icon">💬</span><span>智能问答</span>
+            </div>
+            <div class="nav-item" data-view="kb">
+                <span class="nav-icon">📚</span><span>知识库</span>
+            </div>
+            <div class="nav-item" data-view="pipeline">
+                <span class="nav-icon">🔄</span><span>入库流水线</span>
+            </div>
+            <div class="nav-item" data-view="agent">
+                <span class="nav-icon">🤖</span><span>Agent / ReAct</span>
+            </div>
+            <div class="nav-item" data-view="system">
+                <span class="nav-icon">⚙️</span><span>系统状态</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-status">
+            <div class="status-row"><span>模型</span><span id="side-model">检测中…</span></div>
+            <div class="status-row"><span>向量数</span><span id="side-vectors">-</span></div>
+            <div class="status-row"><span>词项数</span><span id="side-terms">-</span></div>
+            <div class="status-row"><span>活跃连接</span><span id="side-conn">-</span></div>
+        </div>
+    </aside>
+
+    <!-- ============ 主区域 ============ -->
+    <main class="main">
+        <header class="topbar glass">
+            <div>
+                <div class="topbar-title" id="view-title">智能问答</div>
+                <div class="topbar-desc" id="view-desc">双路召回 + RRF 融合 + SSE 流式输出</div>
+            </div>
+            <div class="badges">
+                <div class="badge" id="badge-model"><span class="dot"></span><span>模型加载中</span></div>
+                <div class="badge"><span class="dot"></span><span id="badge-index">索引 -</span></div>
+                <div class="icon-btn" id="theme-toggle" title="切换明暗主题">🌙</div>
+            </div>
+        </header>
+
+        <!-- ---------- 问答 ---------- -->
+        <section class="view active" id="view-chat">
+            <div class="chat-panel glass">
+                <div class="chat-scroll" id="chat-scroll">
+                    <div class="welcome" id="welcome">
+                        <div class="welcome-title">你好，我是知识库助手</div>
+                        <div class="welcome-desc">
+                            回答<b>只来自</b>你入库的文档，并附带可展开的原文引用。<br>
+                            检索走 <b>向量余弦 + BM25 倒排</b> 双路召回，再用 <b>RRF</b> 融合排序。
+                        </div>
+                        <div class="sample-grid">
+                            <button class="sample">出差去上海，住宿费标准是多少？需要谁审批？</button>
+                            <button class="sample">年假有多少天？什么时候需要提前申请？</button>
+                            <button class="sample">接口的错误码规范是怎么约定的？</button>
+                            <button class="sample">写操作接口怎么做幂等？</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="composer">
+                    <div class="composer-row">
+                        <textarea id="question" rows="1" placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+                        <button class="btn primary" id="btn-send">发送</button>
+                        <button class="btn danger" id="btn-stop" style="display:none">停止</button>
+                    </div>
+                    <div class="composer-tools">
+                        <select class="select" id="kb-select"></select>
+                        <label class="switch">
+                            <input type="checkbox" id="deep-thinking">
+                            <span class="track"></span>
+                            <span>深度思考</span>
+                        </label>
+                        <span style="flex:1"></span>
+                        <span style="font-size:11.5px;color:var(--text-tertiary)" id="conv-hint"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ---------- 知识库 ---------- -->
+        <section class="view" id="view-kb">
+            <div class="content-panel glass">
+                <div class="content-scroll">
+                    <div>
+                        <div class="section-title">知识库</div>
+                        <div class="card-grid" id="kb-cards"></div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">新增文档（提交后自动进入入库流水线）</div>
+                        <div class="card">
+                            <div class="field">
+                                <label>目标知识库</label>
+                                <select class="select" id="new-doc-kb" style="width:100%"></select>
+                            </div>
+                            <div class="field">
+                                <label>文档标题</label>
+                                <input id="new-doc-title" placeholder="例如：差旅报销制度">
+                            </div>
+                            <div class="field">
+                                <label>来源类型</label>
+                                <select class="select" id="new-doc-type" style="width:100%">
+                                    <option value="text">纯文本 text</option>
+                                    <option value="markdown">Markdown markdown</option>
+                                    <option value="csv">CSV 表格 csv</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>正文内容</label>
+                                <textarea id="new-doc-content"
+                                          placeholder="# 标题&#10;&#10;## 小节&#10;正文内容…"></textarea>
+                            </div>
+                            <button class="btn primary" id="btn-add-doc">提交入库</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">文档列表</div>
+                        <div class="card" style="padding:6px 10px">
+                            <table class="table" id="doc-table">
+                                <thead>
+                                <tr>
+                                    <th>标题</th>
+                                    <th>类型</th>
+                                    <th>分块数</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th style="text-align:right">操作</th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ---------- 流水线 ---------- -->
+        <section class="view" id="view-pipeline">
+            <div class="content-panel glass">
+                <div class="content-scroll">
+                    <div>
+                        <div class="section-title">入库流水线状态机</div>
+                        <div class="card">
+                            <div class="flow">
+                                <div class="flow-node">PENDING</div>
+                                <span class="flow-arrow">→</span>
+                                <div class="flow-node">PARSING</div>
+                                <span class="flow-arrow">→</span>
+                                <div class="flow-node">CHUNKING</div>
+                                <span class="flow-arrow">→</span>
+                                <div class="flow-node">EMBEDDING</div>
+                                <span class="flow-arrow">→</span>
+                                <div class="flow-node">PERSISTING</div>
+                                <span class="flow-arrow">→</span>
+                                <div class="flow-node">COMPLETED</div>
+                            </div>
+                            <div class="card-desc" style="margin-top:12px">
+                                任意节点失败都会流转到 <b>FAILED</b>，可重试回到 <b>PENDING</b>；
+                                非法状态流转会被状态机直接拒绝（开发期即暴露）。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">任务列表</div>
+                        <div class="card" style="padding:6px 10px">
+                            <table class="table" id="task-table">
+                                <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>文档</th>
+                                    <th>状态</th>
+                                    <th>进度</th>
+                                    <th>耗时</th>
+                                    <th style="text-align:right">操作</th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">节点日志（点击任务行查看）</div>
+                        <div class="card" id="task-log">
+                            <div class="empty">选择一个任务查看各节点耗时与结果</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ---------- Agent ---------- -->
+        <section class="view" id="view-agent">
+            <div class="content-panel glass">
+                <div class="content-scroll">
+                    <div>
+                        <div class="section-title">ReAct 执行（推理 → 行动 → 观察）</div>
+                        <div class="card">
+                            <div class="field">
+                                <label>任务描述</label>
+                                <input id="react-question" value="查一下差旅住宿标准，并告诉我现在几点">
+                            </div>
+                            <button class="btn primary" id="btn-react">执行</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">执行步骤</div>
+                        <div id="react-steps" style="display:flex;flex-direction:column;gap:10px"></div>
+                    </div>
+
+                    <div>
+                        <div class="section-title">意图树</div>
+                        <div class="card" id="intent-tree"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ---------- 系统 ---------- -->
+        <section class="view" id="view-system">
+            <div class="content-panel glass">
+                <div class="content-scroll">
+                    <div>
+                        <div class="section-title">模型状态</div>
+                        <div class="card-grid" id="model-cards"></div>
+                    </div>
+                    <div>
+                        <div class="section-title">索引状态</div>
+                        <div class="card-grid" id="index-cards"></div>
+                    </div>
+                    <div>
+                        <div class="section-title">接口清单</div>
+                        <div class="card" style="padding:6px 10px">
+                            <table class="table">
+                                <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+                                <tbody>
+                                <tr><td>GET</td><td class="mono">/api/chat/stream</td><td>SSE 流式问答</td></tr>
+                                <tr><td>POST</td><td class="mono">/api/chat/ask</td><td>同步问答</td></tr>
+                                <tr><td>POST</td><td class="mono">/api/chat/cancel</td><td>取消进行中的问答</td></tr>
+                                <tr><td>GET</td><td class="mono">/api/kb</td><td>知识库列表</td></tr>
+                                <tr><td>POST</td><td class="mono">/api/kb/{id}/documents</td><td>新增文档并触发入库</td></tr>
+                                <tr><td>GET</td><td class="mono">/api/tasks</td><td>入库任务列表</td></tr>
+                                <tr><td>POST</td><td class="mono">/api/tasks/{id}/retry</td><td>重试失败任务</td></tr>
+                                <tr><td>POST</td><td class="mono">/api/agent/react</td><td>ReAct 执行</td></tr>
+                                <tr><td>GET</td><td class="mono">/api/agent/intent-tree</td><td>意图树结构</td></tr>
+                                <tr><td>GET</td><td class="mono">/api/system/info</td><td>系统状态</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
