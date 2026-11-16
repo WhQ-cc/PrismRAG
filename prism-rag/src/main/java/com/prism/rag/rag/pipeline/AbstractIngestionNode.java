@@ -43,6 +43,25 @@ public abstract class AbstractIngestionNode implements IngestionNode {
      */
     protected static final Logger log = LoggerFactory.getLogger(AbstractIngestionNode.class);
 
+    /**
+     * 执行节点。
+     *
+     * <p><b>为什么必须保留 {@code final}？</b></p>
+     * <p>启动日志里会看到这条 WARN，它是<b>预期之内</b>的，不是 bug：</p>
+     * <pre>
+     * Unable to proxy interface-implementing method [public final void ...execute(...)]
+     * because it is marked as final
+     * </pre>
+     * <p>反过来想就清楚了：{@code @Transactional} 标在子类的 {@code doExecute()} 上，
+     * 它<b>必须</b>经过代理才能生效。如果 {@code execute()} 不是 final，
+     * CGLIB 就会代理它并把调用转发给真实对象，那么内部的 {@code this.doExecute()}
+     * 就是在真实对象上执行的 —— <b>绕过了代理，事务失效</b>。</p>
+     * <p>而现在 {@code execute()} 是 final，CGLIB 无法代理它，
+     * 于是它直接在"代理对象"上执行，里面的 {@code this.doExecute()}
+     * 恰好是<b>非 final</b> 的 → 被拦截 → 转发到真实对象 → <b>事务正常生效</b>。</p>
+     * <p>所以这个 final 是有意为之，配套的代价是：代理对象没有执行字段初始化器，
+     * 所以日志字段必须是 {@code static final}（见上方注释）。</p>
+     */
     @Override
     public final void execute(IngestionContext context) {
         // ① 流转状态（非法流转会在这里抛异常）
