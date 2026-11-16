@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  prism-rag —— 业务层（项目主干）
+  职责：知识库领域模型、入库 Pipeline（解析→分块→向量化→持久化 + 状态机）、
+        双路召回（向量余弦 + BM25 倒排）与 RRF 融合、会话记忆、SSE 流式问答。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.prism</groupId>
+        <artifactId>prism-rag-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>prism-rag</artifactId>
+    <name>prism-rag</name>
+    <description>业务层：知识库、入库流水线、双路召回与会话</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-framework</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-infra-ai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+    </dependencies>
+</project>

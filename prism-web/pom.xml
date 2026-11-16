@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  prism-web —— 展现层
+  纯静态资源模块：index.html + glass.css + app.js，无 Node 构建链。
+  Spring Boot 会把 src/main/resources/static 下的内容直接暴露在站点根路径。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.prism</groupId>
+        <artifactId>prism-rag-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>prism-web</artifactId>
+    <name>prism-web</name>
+    <description>展现层：苹果风玻璃态前端</description>
+</project>

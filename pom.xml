@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  PrismRAG —— 一个从 0 手写的 Java 检索增强问答(RAG)教学级工程
+  ============================================================================
+
+  【为什么拆成多个模块？】
+  分层的目的不是"炫技"，而是让"换模型 / 换存储 / 换检索策略"这类需求
+  只落在一个模块里，不牵动问答主流程。下面自下而上每一层只依赖它的下层：
+
+    prism-common     通用层：统一响应、错误码、全局异常、中文分词器
+        ▲
+    prism-framework  框架层：线程池隔离、Trace 上下文透传、SSE 连接管理
+        ▲
+    prism-infra-ai   模型层：Chat/Embedding 客户端（可插拔，含离线 Mock）
+        ▲
+    prism-rag        业务层：知识库、入库 Pipeline、双路召回、会话与问答
+        ▲
+    prism-agent      智能体层：意图树、ReAct 执行引擎
+        ▲
+    prism-bootstrap  装配层：启动类、配置文件、对外 REST/SSE 接口
+        ▲
+    prism-web        展现层：苹果风玻璃态前端（纯静态资源，无需构建）
+
+  【给初级工程师的阅读顺序】
+  1. prism-bootstrap  →  看接口入口，从 HTTP 进来看整个系统怎么被调用
+  2. prism-rag       →  看业务主干：入库 Pipeline + 检索 + 问答
+  3. prism-infra-ai  →  看模型是怎么被"可插拔"抽象掉的
+  4. prism-framework →  看并发与流式的基础设施
+  5. prism-common    →  看工具类
+  详见 README.md 的「Git 树导读」章节。
+
+  【常用命令】
+  mvn -T 1C clean install -DskipTests     # 全量构建
+  mvn -pl prism-bootstrap -am spring-boot:run   # 只启动应用
+  ============================================================================
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.7</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.prism</groupId>
+    <artifactId>prism-rag-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>prism-rag-parent</name>
+    <description>PrismRAG —— 手写版 Agentic RAG 工程（多模块分层 + 入库流水线 + 双路召回 + SSE 流式）</description>
+
+    <modules>
+        <module>prism-common</module>
+        <module>prism-framework</module>
+        <module>prism-infra-ai</module>
+        <module>prism-rag</module>
+        <module>prism-agent</module>
+        <module>prism-web</module>
+        <module>prism-bootstrap</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块统一版本，子模块引入时不写 version -->
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-framework</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-infra-ai</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-rag</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-agent</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.prism</groupId>
+                <artifactId>prism-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- 所有模块统一使用 Lombok 消灭样板代码 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <!-- 只在装配层打出可执行 jar，子模块保持普通 jar -->
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  prism-bootstrap —— 装配层
+  只放启动类、配置类、Controller（对外 HTTP 契约）。业务逻辑一律不在这里写。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.prism</groupId>
+        <artifactId>prism-rag-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>prism-bootstrap</artifactId>
+    <name>prism-bootstrap</name>
+    <description>装配层：启动类、配置与对外接口</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-rag</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-agent</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-web</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>prism-rag</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.prism.rag.bootstrap.PrismRagApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

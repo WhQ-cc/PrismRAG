@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  prism-infra-ai —— 模型层（可插拔）
+  职责：把"大模型"抽象成 ChatClient / EmbeddingClient 两个接口，
+        内置离线 Mock 实现（无 Key 也能跑通全链路），配了 Key 自动切真实模型。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.prism</groupId>
+        <artifactId>prism-rag-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>prism-infra-ai</artifactId>
+    <name>prism-infra-ai</name>
+    <description>模型层：Chat/Embedding 可插拔客户端（离线 Mock + 真实模型）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+    </dependencies>
+</project>

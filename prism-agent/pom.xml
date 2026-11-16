@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  prism-agent —— 智能体层
+  职责：意图树（问题 → 路由到知识库/动作）、ReAct 执行引擎（推理-行动-观察循环）。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.prism</groupId>
+        <artifactId>prism-rag-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>prism-agent</artifactId>
+    <name>prism-agent</name>
+    <description>智能体层：意图树 + ReAct 执行引擎</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.prism</groupId>
+            <artifactId>prism-rag</artifactId>
+        </dependency>
+    </dependencies>
+</project>
