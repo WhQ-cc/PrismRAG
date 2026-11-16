@@ -98,7 +98,7 @@ git show <commit>          # 看某一步的完整改动与讲解
 | 09 | `feat(agent): 意图树 + ReAct 引擎` | 什么时候该用固定 Workflow，什么时候该用 Agent？ |
 | 10 | `feat(bootstrap): 装配 + 接口 + 演示数据` | 多模块 Spring Boot 的三个必踩坑 |
 | 11 | `feat(web): 玻璃态前端` | 玻璃态的 CSS 到底该怎么写？SSE 怎么消费？ |
-| 12 | `docs: 重型组件接入指南` | 想上 RocketMQ / Redis / Milvus，从哪下手？ |
+| 12 | `docs: 项目总览 README` | Git 树导读、设计决策速查表与演进路线 |
 
 ---
 
@@ -178,27 +178,32 @@ prism-rag-parent/
 │   └── service/       知识库管理、入库提交
 ├── prism-agent/       意图树、ReAct 引擎、工具
 ├── prism-web/         玻璃态前端（index.html + glass.css + app.js）
-├── prism-bootstrap/   启动类、配置、Controller、演示数据
-└── docs/              中文教学文档（重���组件接入指南）
+└── prism-bootstrap/   启动类、配置、Controller、演示数据
 ```
 
 ---
 
-## 九、中文教学文档
+## 九、中文教学文档（本地保留，未上传）
 
-| 文档 | 内容 |
+本仓库只保留**源码、配置与本 README**。
+
+另有一份 **中文教学文档包**（11 篇）在本地维护，未提交到仓库（已在 `.gitignore` 中忽略 `docs/`），内容包括：
+
+| 主题 | 讲什么 |
 |---|---|
-| [`docs/01-架构总览.md`](docs/01-架构总览.md) | 分层、依赖方向、一次请求的调用链 |
-| [`docs/02-入库流水线与状态机.md`](docs/02-入库流水线与状态机.md) | 四节点、状态机、幂等重跑、节点日志 |
-| [`docs/03-双路召回与RRF融合.md`](docs/03-双路召回与RRF融合.md) | BM25 公式推导、倒排索引、RRF 推导 |
-| [`docs/04-SSE流式问答与会话记忆.md`](docs/04-SSE流式问答与会话记忆.md) | 事件协议、记忆策略、断开取消的完整链路 |
-| [`docs/05-可插拔模型与Mock降级.md`](docs/05-可插拔模型与Mock降级.md) | SPI 设计、自动切换、熔断降级路线 |
-| [`docs/06-接入RocketMQ.md`](docs/06-接入RocketMQ.md) | **完整可编译的**生产/消费端代码、事务消息、幂等 |
-| [`docs/07-接入Redis.md`](docs/07-接入Redis.md) | 缓存、会话存储、分布式锁、排队限流 |
-| [`docs/08-意图树.md`](docs/08-意图树.md) | 树形路由、模型分类实现、动态配置 |
-| [`docs/09-ReAct-Agent.md`](docs/09-ReAct-Agent.md) | 工具抽象、循环引擎、写操作人工确认 |
-| [`docs/10-前端玻璃态设计.md`](docs/10-前端玻璃态设计.md) | 玻璃态 CSS 配方、SSE 消费、视图组织 |
-| [`docs/11-踩坑清单.md`](docs/11-踩坑清单.md) | 本项目真实踩过的 8 个坑（含 CGLIB 代理 NPE） |
+| 架构总览 | 分层依赖方向、一次请求的完整调用链、多模块 Spring Boot 三个必踩坑 |
+| 入库流水线 | 状态机、节点模板方法、线程池隔离、幂等重跑、节点日志 |
+| 双路召回与 RRF | BM25 公式推导、倒排索引、RRF 为什么只看排名不看分数 |
+| SSE 与会话记忆 | 事件协议、断开取消的完整链路、摘要 + 近窗记忆策略 |
+| 可插拔模型 | SPI 设计、自动切换、多候选熔断降级路线 |
+| 接入 RocketMQ | 生产者/消费者/事务消息/幂等/兜底扫描（可直接抄走的完整代码） |
+| 接入 Redis | 缓存抽象、会话缓存、分布式锁、ZSET 公平排队 Lua 脚本 |
+| 意图树 | 树形路由、模型分类、意图落库与广播刷新 |
+| ReAct Agent | 工具抽象、循环引擎、写操作人工确认、成本控制 |
+| 前端玻璃态 | 玻璃态 CSS 配方、SSE 消费的四个细节、视图组织 |
+| 踩坑清单 | 真实踩过的 8 个坑（含 CGLIB 代理 NPE、ThreadLocal 串台等） |
+
+想看某个主题的详细展开，可以直接看源码里的中文注释——**每处非显然的设计都在类/方法注释里写了"为什么"**。
 
 ---
 
@@ -231,14 +236,14 @@ curl http://localhost:8080/api/system/info | jq
 
 本项目是**骨架完整、留有扩展点**的工程。常见演进路线（每一项都有对应文档）：
 
-| 方向 | 接入点 | 文档 |
+| 方向 | 接入点 | 关键改动 |
 |---|---|---|
-| 任务可靠性 / 横向扩容 | `IngestionService.submit()` 改发 MQ | [06-RocketMQ](docs/06-接入RocketMQ.md) |
-| 会话共享 / 缓存 | `ConversationMemoryService` | [07-Redis](docs/07-接入Redis.md) |
-| 向量库升级 | 实现 `VectorStore` 接口 | [03-双路召回](docs/03-双路召回与RRF融合.md) |
-| 模型多候选 + 熔断 | `AiAutoConfiguration` | [05-可插拔模型](docs/05-可插拔模型与Mock降级.md) |
-| 意图动态配置 | `IntentTree` 落库 | [08-意图树](docs/08-意图树.md) |
-| 写操作人工确认 | `ReActEngine` 工具注册 | [09-ReAct](docs/09-ReAct-Agent.md) |
+| 任务可靠性 / 横向扩容 | `IngestionService.submit()` 改发 MQ | 生产者 + 消费者 + 幂等检查 + 兜底扫描 |
+| 会话共享 / 缓存 | `ConversationMemoryService` | 先抽象 `CacheService`，再换 Redis 实现 |
+| 向量库升级 | 实现 `VectorStore` 接口 | Milvus / PGVector / ES，业务层零改动 |
+| 模型多候选 + 熔断 | `AiAutoConfiguration` | `FailoverChatClient` + 三态熔断器 |
+| 意图动态配置 | `IntentTree` 落库 | 配置改 DB + 广播消息刷新各节点缓存 |
+| 写操作人工确认 | `ReActEngine` 工具注册 | 工具返回 `PENDING_CONFIRMATION`，前端出确认卡片 |
 
 ---
 
@@ -253,7 +258,7 @@ curl http://localhost:8080/api/system/info | jq
 | 前端 | 原生 HTML/CSS/JS | 零构建链 |
 | 构建 | Maven 多模块 | 7 个模块，分层清晰 |
 
-> 本项目只为教学与演示而生，**未接入鉴权、多租户、审计与限流**，生产化请参考 `docs/` 中的演进路线。
+> 本项目只为教学与演示而生，**未接入鉴权、多租户、审计与限流**，生产化路径见上方「下一步可以往哪走」。
 
 ---
 
@@ -268,5 +273,5 @@ curl http://localhost:8080/api/system/info | jq
 
 ---
 
-**返回**：[Git 树导读](#四git-树导读-最重要的部分) · [快速开始](#一30-秒跑起来) · [踩坑清单](./docs/11-踩坑清单.md)
+**返回**：[Git 树导读](#四git-树导读-最重要的部分) · [快速开始](#一30-秒跑起来) · [设计决策速查](#七核心设计决策速查)
 

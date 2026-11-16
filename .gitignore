@@ -38,6 +38,11 @@ yarn-error.log*
 .factorypath
 nbproject/
 
+# ===== 中文教学文档（本地保留，不上传仓库）=====
+# 这套文档是给"自己看/自己讲"的讲稿，不进公开仓库。
+# 需要同步到别处时，把 docs/ 从这里移除并单独 git add 即可。
+docs/
+
 # ===== 系统文件 =====
 .DS_Store
 Thumbs.db
