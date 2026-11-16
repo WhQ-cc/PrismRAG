@@ -102,6 +102,10 @@ public class IngestionPipeline {
                 task.setProgress(context.getState().progress());
                 task.setErrorMessage(context.getError());
                 task.setNodeLog(toJson(context.getLogs()));
+                // 首次同步时补上开始时间
+                if (task.getStartedAt() == null) {
+                    task.setStartedAt(LocalDateTime.now());
+                }
                 task.setFinishedAt(LocalDateTime.now());
                 task.setCostMillis(costMillis);
                 taskRepository.save(task);

@@ -18,7 +18,30 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractIngestionNode implements IngestionNode {
 
-    protected final Logger log = LoggerFactory.getLogger(getClass());
+    /**
+     * <b>必须是 static 的！</b>
+     *
+     * <p>这是一个真实踩过的坑：如果写成
+     * {@code protected final Logger log = LoggerFactory.getLogger(getClass());}
+     * （实例字段 + 初始化器），在 {@code PersistNode} 上加了 {@code @Transactional} 之后会 NPE：</p>
+     *
+     * <pre>
+     *   Cannot invoke "org.slf4j.Logger.error(String, Object[])" because "this.log" is null
+     * </pre>
+     *
+     * <p><b>原因：</b>{@code @Transactional} 用 CGLIB 生成代理，代理对象由 Objenesis 创建，
+     * <b>不会执行构造方法，也就不会执行字段初始化器</b>。
+     * 而 {@code execute()} 声明为 {@code final}——CGLIB <b>不能重写 final 方法</b>，
+     * 于是它不会被转发到真实对象，而是直接在"未初始化的代理对象"上执行，
+     * 访问实例字段 {@code log} 自然就是 null。</p>
+     *
+     * <p><b>两种修法：</b></p>
+     * <ol>
+     *   <li>日志字段用 {@code static final}（静态字段由类加载器初始化，与实例无关）——本项目采用；</li>
+     *   <li>或者去掉 {@code final}，让方法能被代理转发。</li>
+     * </ol>
+     */
+    protected static final Logger log = LoggerFactory.getLogger(AbstractIngestionNode.class);
 
     @Override
     public final void execute(IngestionContext context) {

@@ -1,11 +1,13 @@
 package com.prism.rag.rag.pipeline.node;
 
 import com.prism.rag.common.math.VectorUtils;
+import com.prism.rag.rag.domain.KnowledgeBase;
 import com.prism.rag.rag.domain.KnowledgeChunk;
 import com.prism.rag.rag.domain.KnowledgeDocument;
 import com.prism.rag.rag.pipeline.AbstractIngestionNode;
 import com.prism.rag.rag.pipeline.IngestionContext;
 import com.prism.rag.rag.pipeline.IngestionState;
+import com.prism.rag.rag.repository.KnowledgeBaseRepository;
 import com.prism.rag.rag.repository.KnowledgeChunkRepository;
 import com.prism.rag.rag.repository.KnowledgeDocumentRepository;
 import com.prism.rag.rag.retrieval.RetrievalService;
@@ -37,13 +39,16 @@ public class PersistNode extends AbstractIngestionNode {
 
     private final KnowledgeChunkRepository chunkRepository;
     private final KnowledgeDocumentRepository documentRepository;
+    private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final RetrievalService retrievalService;
 
     public PersistNode(KnowledgeChunkRepository chunkRepository,
                        KnowledgeDocumentRepository documentRepository,
+                       KnowledgeBaseRepository knowledgeBaseRepository,
                        RetrievalService retrievalService) {
         this.chunkRepository = chunkRepository;
         this.documentRepository = documentRepository;
+        this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.retrievalService = retrievalService;
     }
 
@@ -94,6 +99,15 @@ public class PersistNode extends AbstractIngestionNode {
             document.setChunkCount(saved.size());
             document.setUpdatedAt(LocalDateTime.now());
             documentRepository.save(document);
+        }
+
+        // ⑤ 同步知识库的统计数字（列表页直接展示，避免每次 count）
+        KnowledgeBase kb = knowledgeBaseRepository.findById(context.getKbId()).orElse(null);
+        if (kb != null) {
+            kb.setDocumentCount((int) documentRepository.countByKbId(context.getKbId()));
+            kb.setChunkCount((int) chunkRepository.countByKbId(context.getKbId()));
+            kb.setUpdatedAt(LocalDateTime.now());
+            knowledgeBaseRepository.save(kb);
         }
     }
 
