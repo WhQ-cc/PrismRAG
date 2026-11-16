@@ -141,6 +141,11 @@ public class MockChatClient implements ChatClient {
 
     /**
      * 标准问答：抽取式回答。
+     *
+     * <p><b>注意：这里不再自己重排 context。</b>
+     * context 的顺序就是检索层 RRF 融合后的排序，是"最可信的相关性顺序"。
+     * Mock 如果自己再排一次，就会和引用编号对不上——用户看到 [1] 指向的
+     * 却是另一条内容，非常困惑。抽取式回答只做"选句子"，不做"选 chunk"。</p>
      */
     private String buildStandardAnswer(ChatRequest request) {
         String question = request.getQuestion() == null ? "" : request.getQuestion();
@@ -150,26 +155,13 @@ public class MockChatClient implements ChatClient {
             return buildNoContextAnswer(question);
         }
 
-        // ① 按与问题的词元重合度给上下文排序
-        List<ContextItem> ranked = new ArrayList<>(context);
-        Set<String> queryTokens = new HashSet<>(Tokenizer.tokenize(question));
-        ranked.sort(Comparator.comparingInt(
-                (ContextItem item) -> -overlap(queryTokens, item)).reversed());
+        // ① 按检索层给出的顺序，取最靠前的 2 条（不要再排序！）
+        List<ContextItem> selected = context.size() > 2 ? context.subList(0, 2) : context;
 
-        // ② 取最相关的 2 条，拼出带引用编号的回答
-        StringBuilder answer = new StringBuilder();
-        List<ContextItem> selected = ranked.stream()
-                .filter(item -> overlap(queryTokens, item) > 0)
-                .limit(2)
-                .toList();
-        if (selected.isEmpty()) {
-            // 没有词元重合，但检索确实召回了内容，就取第一条
-            selected = ranked.subList(0, Math.min(1, ranked.size()));
-        }
-
-        // ③ 如果有会话记忆，带一句上下文衔接
+        // ② 如果有会话记忆，带一句上下文衔接
         String memoryHint = memoryHint(request);
 
+        StringBuilder answer = new StringBuilder();
         answer.append(memoryHint);
         for (int i = 0; i < selected.size(); i++) {
             ContextItem item = selected.get(i);
